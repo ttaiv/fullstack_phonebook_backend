@@ -1,82 +1,95 @@
 const express = require('express')
 const app = express()
-app.use(express.json())
 
 const morgan = require('morgan')
+const cors = require('cors')
+
+// Middlewares
+app.use(express.json())
+app.use(cors())
+app.use(express.static('build'))
 app.use(morgan('tiny'))
 
-const cors = require('cors')
-app.use(cors())
+// Database connection
+require('dotenv').config()
+const Contact = require('./models/contact')
 
-app.use(express.static('build'))
+const errorHandler = (error, req, res, next) => {
+    console.error(error.message)
+    if (error.name === 'CastError') 
+        return response.status(400).send({ error: 'malformatted id' })
 
-let persons = [
-    {
-    "name": "Arto Hellas",
-    "number": "040-123456",
-    "id": 1
-    },
-    {
-    "name": "Ada Lovelace",
-    "number": "39-44-5323523",
-    "id": 2
-    },
-    {
-    "name": "Dan Abramov",
-    "number": "12-43-234345",
-    "id": 3
-    },
-    {
-    "name": "Mary Poppendieck",
-    "number": "39-23-6423122",
-    "id": 4
-    }
-]
+    next(error)
+}
+const unknownEndpoint = (req, res) => {
+    res.status(404).send({ error: 'unknown endpoint' })
+}
 
-const generateId = () => Math.floor(Math.random() * 500)
-
+// Routes
 app.get('/api/persons', (req, res) => {
-    res.json(persons)
-})
-app.get('/info', (req, res) => {
-    res.send(`
-        <div>
-            <p> Phonebook has info for ${persons.length} people. </p>
-            <p> ${new Date()} </p>
-        </div>`
+    Contact.find({}).then(persons =>
+        res.json(persons)
     )
 })
-app.get('/api/persons/:id', (req, res) => {
-    const wanted_id = Number(req.params.id);
-    const person = persons.find(person => person.id === wanted_id);
-    if (person)
-        res.json(person)
-    else
-        res.status(404).end()
+
+app.get('/info', (req, res) => {
+    Contact.count({}).then(result => 
+    res.send(`
+        <div>
+            <p> Phonebook has info for ${result} people. </p>
+            <p> ${new Date()} </p>
+        </div>`
+    ))
 })
-app.delete('/api/persons/:id', (req, res) => {
-    const id_toDelete = Number(req.params.id)
-    const index_toDelete = persons.findIndex(person => person.id === id_toDelete)
-    if (index_toDelete === -1)
-        res.status(404).end()
-    else {
-        persons.splice(index_toDelete, 1)
-        res.status(204).end()
-    }
+
+app.get('/api/persons/:id', (req, res, next) => {
+    const wanted_id = req.params.id
+    Contact.findById(wanted_id)
+        .then(person => res.json(person))
+        .catch(error => next(error))
 })
+
+app.delete('/api/persons/:id', (req, res, next) => {
+    const id_toDelete = req.params.id
+    Contact.findByIdAndDelete(id_toDelete)
+        .then(result => res.status(204).end())
+        .catch(error => next(error))
+})
+
 app.post('/api/persons/', (req, res) => {
     const name = req.body.name
     const number = req.body.number
     if (!name || !number)
-        res.status(400).json({error: 'Name or number missing.'})
-    else if (persons.some(person => person.name === name))
-        res.status(400).json({error: `${name} is already in the phonebook.`})
-    else {
-        const newPerson = {name, number, id: generateId()}
-        persons = persons.concat(newPerson)
-        res.json(newPerson)
-    }
+        return res.status(400).json({error: 'Name or number missing.'})
+
+    const existingPersons = Contact.find({})
+    existingPersons.then(persons => {
+        if (persons.some(person => person.name === name))
+            res.status(400).json({error: `${name} is already in the phonebook.`})
+        else {
+            const newContact = new Contact({name, number})
+            newContact.save().then(result => {
+                console.log(`added ${name} number ${number} to phonebook`)
+                res.json(newContact)
+            })
+        }
+    })
 })
+
+app.put('/api/persons/:id', (req, res, next) => {
+    const id_toModify = req.params.id
+    const newPerson = {
+        name: req.body.name,
+        number: req.body.number
+    }
+    Contact.findByIdAndUpdate(id_toModify, newPerson, { new: true })
+        .then(updatedPerson => res.json(updatedPerson))
+        .catch(error => next(error))
+})
+
+app.use(unknownEndpoint)
+app.use(errorHandler)
+
 const PORT = process.env.PORT || 3001;
 app.listen(PORT, () => {
     console.log(`Server running on port ${PORT}`)
