@@ -1,1 +1,2 @@
-https://phonebook-backend-b23v.onrender.com/api/persons
+Link to deployed app.
+https://phonebook-backend-b23v.onrender.com/
