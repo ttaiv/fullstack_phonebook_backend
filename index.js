@@ -18,6 +18,8 @@ const errorHandler = (error, req, res, next) => {
     console.error(error.message)
     if (error.name === 'CastError') 
         return response.status(400).send({ error: 'malformatted id' })
+    if (error.name === 'ValidationError') 
+        return res.status(400).json({ error: error.message })
 
     next(error)
 }
@@ -56,7 +58,7 @@ app.delete('/api/persons/:id', (req, res, next) => {
         .catch(error => next(error))
 })
 
-app.post('/api/persons/', (req, res) => {
+app.post('/api/persons/', (req, res, next) => {
     const name = req.body.name
     const number = req.body.number
     if (!name || !number)
@@ -68,10 +70,12 @@ app.post('/api/persons/', (req, res) => {
             res.status(400).json({error: `${name} is already in the phonebook.`})
         else {
             const newContact = new Contact({name, number})
-            newContact.save().then(result => {
-                console.log(`added ${name} number ${number} to phonebook`)
-                res.json(newContact)
-            })
+            newContact.save()
+                .then(result => {
+                    console.log(`added ${name} number ${number} to phonebook`)
+                    res.json(newContact)
+                })
+                .catch(error => next(error))
         }
     })
 })
@@ -82,7 +86,7 @@ app.put('/api/persons/:id', (req, res, next) => {
         name: req.body.name,
         number: req.body.number
     }
-    Contact.findByIdAndUpdate(id_toModify, newPerson, { new: true })
+    Contact.findByIdAndUpdate(id_toModify, newPerson, { new: true, runValidators: true, context: 'query' })
         .then(updatedPerson => res.json(updatedPerson))
         .catch(error => next(error))
 })
