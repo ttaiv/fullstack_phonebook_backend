@@ -1,5 +1,5 @@
 # Fullstack open part 3
-This repository contain assignments for part 3 of University of Helsinki course Full stack open.  
+This repository contain excercises for part 3 of University of Helsinki course Full stack open.  
 Main course repository: https://github.com/ttaiv/fullstack  
 Course materials: https://fullstackopen.com/en/
 
